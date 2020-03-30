@@ -503,8 +503,17 @@ func (p *NamedProcessCollector) scrape(ch chan<- prometheus.Metric) {
 		if p.reportMissing {
 			// loop over all process names, if process does not have process running (in groups) then report num_procs as zero
 			for _, pName := range p.processNames {
-				_, present := groups[pName]
-				if !present {
+				reg, _ := regexp.Compile(pName)
+
+				matched := false
+				for gname, _ := range groups {
+					if reg.MatchString(gname) {
+						matched = true
+						break
+					}
+				}
+
+				if !matched {
 					ch <- prometheus.MustNewConstMetric(numprocsDesc,
 						prometheus.GaugeValue, float64(0), pName)
 				}

@@ -41,6 +41,11 @@ type (
 		captures map[string]string
 	}
 
+	exeregexMatcher struct {
+		regexes  []*regexp.Regexp
+		captures map[string]string
+	}
+
 	andMatcher []Matcher
 
 	templateNamer struct {
@@ -165,6 +170,20 @@ func (m *cmdlineMatcher) Match(nacl common.ProcAttributes) bool {
 	return true
 }
 
+func (m *exeregexMatcher) Match(nacl common.ProcAttributes) bool {
+	if len(nacl.Cmdline) == 0 {
+		return false
+	}
+	thisbase := filepath.Base(nacl.Cmdline[0])
+
+	for _, regex := range m.regexes {
+		if regex.MatchString(thisbase) {
+			return true
+		}
+	}
+	return false
+}
+
 func (m andMatcher) Match(nacl common.ProcAttributes) bool {
 	for _, matcher := range m {
 		if !matcher.Match(nacl) {
@@ -234,6 +253,19 @@ func getProcessNames(procname interface{}) []string {
 				} else {
 					names = append(names, value)
 				}
+			}
+		} else if key == "exeregex" {
+			// "exeregex" block in config file - extracts names from array
+			exes, ok := v.([]interface{})
+			if !ok {
+				return nil
+			}
+			for _, rawValue := range exes {
+				value, ok := rawValue.(string)
+				if !ok {
+					return nil
+				}
+				names = append(names, value)
 			}
 		}
 	}
@@ -352,6 +384,20 @@ func getMatchNamer(yamlmn interface{}) (common.MatchNamer, error) {
 			rs = append(rs, r)
 		}
 		matchers = append(matchers, &cmdlineMatcher{
+			regexes:  rs,
+			captures: make(map[string]string),
+		})
+	}
+	if exebase, ok := smap["exeregex"]; ok {
+		var rs []*regexp.Regexp
+		for _, c := range exebase {
+			r, err := regexp.Compile(c)
+			if err != nil {
+				return nil, fmt.Errorf("bad exebase regex %q: %v", c, err)
+			}
+			rs = append(rs, r)
+		}
+		matchers = append(matchers, &exeregexMatcher{
 			regexes:  rs,
 			captures: make(map[string]string),
 		})
