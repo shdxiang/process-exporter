@@ -506,7 +506,11 @@ func (p *NamedProcessCollector) scrape(ch chan<- prometheus.Metric) {
 				reg, _ := regexp.Compile(pName)
 
 				matched := false
-				for gname, _ := range groups {
+				for gname, gcounts := range groups {
+					if gcounts.Procs == 0 {
+						continue
+					}
+
 					if reg.MatchString(gname) {
 						matched = true
 						break
@@ -514,6 +518,7 @@ func (p *NamedProcessCollector) scrape(ch chan<- prometheus.Metric) {
 				}
 
 				if !matched {
+
 					ch <- prometheus.MustNewConstMetric(numprocsDesc,
 						prometheus.GaugeValue, float64(0), pName)
 				}
@@ -521,6 +526,9 @@ func (p *NamedProcessCollector) scrape(ch chan<- prometheus.Metric) {
 		}
 
 		for gname, gcounts := range groups {
+			if gcounts.Procs == 0 {
+				continue
+			}
 			ch <- prometheus.MustNewConstMetric(numprocsDesc,
 				prometheus.GaugeValue, float64(gcounts.Procs), gname)
 			ch <- prometheus.MustNewConstMetric(membytesDesc,
